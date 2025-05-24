@@ -5,6 +5,7 @@ using KoboRack.Api.Extensions;
 using KoboRack.Core.IServices;
 using KoboRack.Core.Services;
 using KoboRack.Utility;
+using Microsoft.OpenApi.Models;
 
 namespace KoboRack.Api
 {
@@ -23,7 +24,34 @@ namespace KoboRack.Api
             builder.Services.AddDependencies(configuration);
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(option =>
+            {
+                option.SwaggerDoc("v1", new OpenApiInfo { Title = "KoboRack API", Version = "v1" });
+                option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme()
+                {
+                    In = ParameterLocation.Header,
+                    Description = "Please enter a valid token",
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    Scheme = "Bearer"
+                });
+
+                option.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer",
+                            }
+                        },
+                        new string[] { }
+                    }
+                });
+            });
 
             //         builder.Services.AddDbContext<SaviDbContext>(options =>
             //options.UseSqlServer(configuration.GetConnectionString("SaviSavings")));
@@ -42,12 +70,10 @@ namespace KoboRack.Api
 			// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
 			builder.Services.AddEndpointsApiExplorer();
-			builder.Services.AddSwaggerGen();
-			builder.Services.AddCors();
 
             builder.Services.AddAutoMapper(typeof(MapperProfile));
 
-
+            builder.Services.AddAuthenticationConfiguration(configuration);
 
             var app = builder.Build();
 
@@ -55,7 +81,7 @@ namespace KoboRack.Api
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-                app.UseSwaggerUI( c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Savi v1"));
+                app.UseSwaggerUI( c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "KoboRack v1"));
             }
             //using (var scope = app.Services.CreateScope())
             //{
@@ -64,14 +90,12 @@ namespace KoboRack.Api
             //}
             using (var scope = app.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
             {
-                //Seeder.SeedRolesAndAdminUser(scope.ServiceProvider).Wait(); 
+                Seeder.SeedRolesAndAdminUser(scope.ServiceProvider).Wait();
             }
 
-            app.UseCors(p => p.AllowAnyOrigin()
-                .AllowAnyHeader().AllowAnyMethod());
+            app.UseCors("AllowAllOrigins");
             app.UseHttpsRedirection();
             app.UseAuthentication();
-            app.UseCors("AllowAllOrigins");
 
             app.UseAuthorization();
             app.UseHangfireDashboard();
