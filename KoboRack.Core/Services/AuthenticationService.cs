@@ -62,12 +62,12 @@ namespace KoboRack.Core.Services
                 {
                     var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
                     var authClaims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Role, role),
-            };
+                    {
+                        new Claim(ClaimTypes.Name, user.Email),
+                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                        new Claim(ClaimTypes.NameIdentifier, user.Id),
+                        new Claim(ClaimTypes.Role, role),
+                    };
                     var jwtToken = GetToken(authClaims);
                     return ApiResponse<string>.Success(new JwtSecurityTokenHandler().WriteToken(jwtToken), "Login successful", 200);
                 }

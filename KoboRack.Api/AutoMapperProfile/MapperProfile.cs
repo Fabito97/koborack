@@ -18,6 +18,8 @@ namespace KoboRack.Api.AutoMapperProfile
             CreateMap<GroupDTO, Group>().ReverseMap();
             CreateMap<GroupDTO2, Group>().ReverseMap();
             CreateMap<AppUserUpdateDto, AppUser>().ReverseMap();
+            CreateMap<WalletResponseDto, Wallet>().ReverseMap();
+            CreateMap<WalletDto, Wallet>().ReverseMap();
         }
     }
 }
