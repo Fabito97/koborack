@@ -23,6 +23,7 @@ namespace KoboRack.Data.Context
         public DbSet<WalletFunding> WalletFundings { get; set; }
         public DbSet<GroupSavingsMembers> GroupSavingsMembers { get; set; }
         public DbSet<FundingAnalytics> FundingAnalytics { get; set; }
+        public DbSet<Otp> Otps { get; set; }
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             foreach (var item in ChangeTracker.Entries<BaseEntity>())
@@ -44,6 +45,11 @@ namespace KoboRack.Data.Context
                 }
             }
             return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task UpdateAsync(Otp newOtp)
+        {
+            throw new NotImplementedException();
         }
 
         protected override void OnModelCreating(ModelBuilder builder)

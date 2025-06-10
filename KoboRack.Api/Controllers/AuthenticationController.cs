@@ -7,6 +7,7 @@ using KoboRack.Core.IServices;
 using KoboRack.Core.Services;
 using KoboRack.Model;
 using KoboRack.Model.Entities;
+using static Google.Apis.Requests.BatchRequest;
 
 namespace KoboRack.Api.Controllers
 {
@@ -29,7 +30,12 @@ namespace KoboRack.Api.Controllers
             {
                 return BadRequest(new ApiResponse<string>(false, "Invalid model state.", 400, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
             }
-            return Ok(await _authenticationService.LoginAsync(loginDTO));
+            var response = await _authenticationService.LoginAsync(loginDTO);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
 
         [HttpPost("forgot-password")]
@@ -110,21 +116,38 @@ namespace KoboRack.Api.Controllers
             {
                 return BadRequest(new ApiResponse<string>(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
             }
-            return Ok(await _authenticationService.RegisterAsync(appUserCreateDto));
+            var response = await _authenticationService.RegisterAsync(appUserCreateDto);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
-        [HttpGet("ConfirmEmail")]
-        public async Task<IActionResult> ConfirmEmail(string userId, string token)
+
+        [HttpPost("ConfirmEmail")]
+        public async Task<IActionResult> ConfirmEmail([FromBody]VerifyOtpDto otpDto)
         {
-            return Ok(await _authenticationService.ConfirmEmailAsync(userId, token));
+            var response = await _authenticationService.ConfirmEmailAsync(otpDto.userId, otpDto.token);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
+
         [HttpPost("resend-verification-email")]
-        public async Task<IActionResult> ResendEmailVerificationLink(string userId)
+        public async Task<IActionResult> ResendEmailVerificationLink([FromBody]ResendVerificationOtpDto verificationOtpDto)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(new ApiResponse<string>(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
             }
-            return Ok(await _authenticationService.ResendEmailVerifyLink(userId));
+            var response = await _authenticationService.ResendEmailVerifyLink(verificationOtpDto.UserId);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
 
         [HttpPost("signin-google/{token}")]
@@ -134,7 +157,12 @@ namespace KoboRack.Api.Controllers
             {
                 return BadRequest(new ApiResponse<string>(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
             }
-            return Ok(await _authenticationService.VerifyAndAuthenticateUserAsync(token));
+            var response = await _authenticationService.VerifyAndAuthenticateUserAsync(token);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
 
         [HttpPut("updateUserInformation")]
@@ -144,7 +172,12 @@ namespace KoboRack.Api.Controllers
             {
                 return BadRequest(new ApiResponse<string>(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
             }
-            return Ok(await _authenticationService.UpdateUserInformation(userId, formFile));
+            var response = await _authenticationService.UpdateUserInformation(userId, formFile);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
     }
 }
