@@ -1,4 +1,4 @@
-using Hangfire;
+﻿using Hangfire;
 using KoboRack.Api.AutoMapperProfile;
 using KoboRack.Api.Configurations;
 using KoboRack.Api.Extensions;
@@ -94,7 +94,7 @@ namespace KoboRack.Api
             }
 
             app.UseCors("AllowAllOrigins");
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();
             app.UseAuthentication();
 
             app.UseAuthorization();
