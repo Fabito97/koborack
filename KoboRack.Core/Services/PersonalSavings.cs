@@ -5,22 +5,25 @@ using KoboRack.Core.IServices;
 using KoboRack.Data.Repositories.Interface;
 using KoboRack.Model.Entities;
 using KoboRack.Model.Enums;
+using Microsoft.AspNetCore.Identity;
 
 namespace KoboRack.Core.Services
 {
     public class PersonalSavings : IPersonalSavings
     {
         private readonly ISavingRepository _savingRepository;
+        private readonly UserManager<AppUser> _userManager;
         private readonly ICloudinaryServices<Saving> _cloudinaryServices;
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
 
-        public PersonalSavings(ISavingRepository savingRepository, ICloudinaryServices<Saving> cloudinaryServices, IMapper mapper, IUnitOfWork unitOfWork)
+        public PersonalSavings(ISavingRepository savingRepository, UserManager<AppUser> userManager, ICloudinaryServices<Saving> cloudinaryServices, IMapper mapper, IUnitOfWork unitOfWork)
         {
             _savingRepository = savingRepository;
             _cloudinaryServices = cloudinaryServices;
             _mapper = mapper;
             _unitOfWork = unitOfWork;
+            _userManager = userManager;
         }
 
         public async Task<ResponseDto<string>> SetPersonal_Savings_Target(PersonalSavingsDTO saving, string userId)
@@ -29,47 +32,107 @@ namespace KoboRack.Core.Services
 
             try
             {
-                saving.NextRuntime = DateTime.Today;
-
+                // Validate amounts
                 if (saving.TargetAmount <= 0 || saving.AmountToAdd <= 0)
                 {
-                    SetErrorResponse(response, "TargetAmount or AmountToAdd cannot be less than or equal to zero", 400);
+                    SetErrorResponse(response, "TargetAmount and AmountToAdd must be greater than zero.", 400);
                     return response;
                 }
 
-                decimal multiplier;
-                switch (saving.FundFrequency)
+                // Calculate number of savings cycles required
+                int numPayments = (int)Math.Ceiling(saving.TargetAmount / saving.AmountToAdd);
+
+                // Start from today
+                DateTime currentDate = DateTime.Today;
+
+                // Calculate EndDate
+                for (int i = 0; i < numPayments; i++)
                 {
-                    case FundFrequency.Daily:
-                        multiplier = 1;
-                        break;
-                    case FundFrequency.Weekly:
-                        multiplier = 7;
-                        break;
-                    default:
-                        multiplier = 31;
-                        break;
+                    switch (saving.FundFrequency)
+                    {
+                        case FundFrequency.Daily:
+                            currentDate = currentDate.AddDays(1);
+                            break;
+
+                        case FundFrequency.Weekly:
+                            currentDate = currentDate.AddDays(7);
+                            break;
+
+                        case FundFrequency.Monthly:
+                            currentDate = currentDate.AddMonths(1);
+                            break;
+
+                        default:
+                            SetErrorResponse(response, "Unsupported FundFrequency.", 400);
+                            return response;
+                    }
                 }
 
-                var t = (saving.TargetAmount / saving.AmountToAdd) * multiplier;
-                double z = (double)t;
-                saving.EndDate = DateTime.Now.AddDays(z);
-                saving.WithdrawalDate = saving.EndDate.AddDays(1);
-                saving.UserId = userId;
-                var personalSaving = _mapper.Map<Saving>(saving);
+                var newGoal = new Saving();
 
-                var newTarget = await _savingRepository.CreateSavings(personalSaving);
-                var goalUrl = await _cloudinaryServices.UploadImage(personalSaving.Id, saving.GoalUrl);
-                personalSaving.GoalUrl = goalUrl;
-                _savingRepository.UpdateAsync(personalSaving);
-                await _savingRepository.SaveChangesAsync();
-                if (newTarget)
+                newGoal.EndDate = currentDate;
+                newGoal.WithdrawalDate = newGoal.EndDate.AddDays(1);
+
+                // Set NextRuntime based on AutoSave
+                if (saving.AutoSave)
                 {
-                    SetSuccessResponse(response, $"Your target of amount {personalSaving.TargetAmount} has been successfully created", 200);
+                    // Schedule next payment according to FundFrequency
+                    DateTime nextRuntime = DateTime.Today;
+                    switch (saving.FundFrequency)
+                    {
+                        case FundFrequency.Daily:
+                            nextRuntime = nextRuntime.AddDays(1);
+                            break;
+
+                        case FundFrequency.Weekly:
+                            nextRuntime = nextRuntime.AddDays(7);
+                            break;
+
+                        case FundFrequency.Monthly:
+                            nextRuntime = nextRuntime.AddMonths(1);
+                            break;
+                    }
+                    newGoal.NextRuntime = nextRuntime;
                 }
                 else
                 {
-                    SetErrorResponse(response, $"Unable to create target of amount {personalSaving.TargetAmount}", 400);
+                    // If AutoSave is OFF → NextRuntime is null (manual)
+                    newGoal.NextRuntime = null;
+                }
+
+                newGoal.UserId = userId;
+                newGoal.Description = saving.Description;
+                newGoal.TargetAmount = saving.TargetAmount;
+                newGoal.TargetName = saving.TargetName;
+                newGoal.AmountToAdd = saving.AmountToAdd;
+                newGoal.FundFrequency = saving.FundFrequency;
+                newGoal.AutoSave = saving.AutoSave;
+
+                //var personalSaving = _mapper.Map<Saving>(saving);
+
+                // Save to database
+                var newTarget = await _savingRepository.CreateSavings(newGoal);
+
+                // Upload goal image (if provided)
+                if (saving.GoalUrl != null)
+                {
+                    var goalUrl = await _cloudinaryServices.UploadImage(newGoal.Id, saving.GoalUrl);
+
+                    newGoal.GoalUrl = goalUrl;
+                }
+
+                // Update record with goal URL
+                _savingRepository.UpdateAsync(newGoal);
+                await _savingRepository.SaveChangesAsync();
+
+                // Return response
+                if (newTarget)
+                {
+                    SetSuccessResponse(response, $"Your savings target of ₦{newGoal.TargetAmount} has been created successfully.", 200);
+                }
+                else
+                {
+                    SetErrorResponse(response, "Unable to create savings target.", 400);
                 }
 
                 return response;
@@ -80,6 +143,7 @@ namespace KoboRack.Core.Services
                 return response;
             }
         }
+
         private static void SetErrorResponse(ResponseDto<string> response, string errorMessage, int statusCode)
         {
             response.DisplayMessage = "Failed";
@@ -110,26 +174,28 @@ namespace KoboRack.Core.Services
             response.Result = default(T);
             response.StatusCode = statusCode;
         }
-        public async Task<ResponseDto<List<Saving>>> Get_ListOf_All_UserTargets(string userId)
+        public async Task<ResponseDto<List<GetUserSavingsDto>>> Get_ListOf_All_UserTargets(string userId)
         {
-            var response = new ResponseDto<List<Saving>>();
+            var response = new ResponseDto<List<GetUserSavingsDto>>();
 
             try
             {
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    SetNotFoundResponse(response, "User not found", 404);
+                }
                 var listOfTargets = await _savingRepository.GetAllSetSavingsByUserId(userId);
 
-                if (listOfTargets.Any())
-                {
-                    SetSuccessResponse(response, "Targets retrieved successfully", listOfTargets, 200);
-                }
-                else
-                {
-                    SetNotFoundResponse(response, "No targets found for the user", 404);
-                }
+                var savings = _mapper.Map<List<GetUserSavingsDto>>(listOfTargets);
+
+                SetSuccessResponse(response, "Targets retrieved successfully", savings, 200);
+
             }
             catch (Exception ex)
             {
                 SetErrorResponse(response, ex.Message, 500);
+
             }
 
             return response;
@@ -159,6 +225,105 @@ namespace KoboRack.Core.Services
 
             return response;
         }
+
+        public async Task<ResponseDto<Saving>> UpdatePersonalSavings(string personalSavingsId, PersonalSavingsDTO savings)
+        {
+            var response = new ResponseDto<Saving>();
+
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(savings.UserId);
+
+                if (user == null)
+                {
+                    SetErrorResponse(response, "User not found", 404);
+                    return response;
+                }
+
+                var personalSavings = await _savingRepository.GetSavingByIdAsync(personalSavingsId);
+
+                if (personalSavings == null)
+                {
+                    SetNotFoundResponse(response, "Personal savings details not found", 404);
+                    return response;
+                }
+
+                // Update fields
+                personalSavings.AmountToAdd = savings.AmountToAdd;
+                personalSavings.TargetName = savings.TargetName;
+                personalSavings.Description = savings.Description;
+                personalSavings.FundFrequency = savings.FundFrequency;
+                personalSavings.TargetAmount = savings.TargetAmount;
+                personalSavings.AutoSave = savings.AutoSave;
+
+                if (savings.GoalUrl != null)
+                {
+                    personalSavings.GoalUrl = await _cloudinaryServices.UploadImage(personalSavingsId, savings.GoalUrl);
+                }
+
+                // Recalculate EndDate, WithdrawalDate
+                decimal cyclesNeeded = personalSavings.TargetAmount / personalSavings.AmountToAdd;
+
+                DateTime endDate;
+
+                switch (personalSavings.FundFrequency)
+                {
+                    case FundFrequency.Daily:
+                        endDate = DateTime.Now.AddDays((double)cyclesNeeded);
+                        break;
+
+                    case FundFrequency.Weekly:
+                        endDate = DateTime.Now.AddDays((double)cyclesNeeded * 7);
+                        break;
+
+                    case FundFrequency.Monthly:
+                        int monthsNeeded = (int)Math.Ceiling(cyclesNeeded);
+                        endDate = DateTime.Now.AddMonths(monthsNeeded);
+                        break;
+
+                    default:
+                        throw new Exception("Invalid FundFrequency");
+                }
+
+                personalSavings.EndDate = endDate;
+                personalSavings.WithdrawalDate = endDate.AddDays(1);
+
+                // Set NextRuntime depending on AutoSave
+                if (personalSavings.AutoSave)
+                {
+                    switch (personalSavings.FundFrequency)
+                    {
+                        case FundFrequency.Daily:
+                            personalSavings.NextRuntime = DateTime.Now.AddDays(1);
+                            break;
+
+                        case FundFrequency.Weekly:
+                            personalSavings.NextRuntime = DateTime.Now.AddDays(7);
+                            break;
+
+                        case FundFrequency.Monthly:
+                            personalSavings.NextRuntime = DateTime.Now.AddMonths(1);
+                            break;
+                    }
+                }
+                else
+                {
+                    // For manual savings, we can set to a past date or nullable
+                    personalSavings.NextRuntime = DateTime.Now.AddDays(-1);
+                }
+
+                _savingRepository.UpdateAsync(personalSavings);
+
+                SetSuccessResponse(response, "Personal savings details updated successfully", personalSavings, 200);
+            }
+            catch (Exception ex)
+            {
+                SetErrorResponse(response, ex.Message, 500);
+            }
+
+            return response;
+        }
+
 
         public async Task<ResponseDto<decimal>> GetTotalGoalAmountByUser(string userId)
         {
@@ -193,8 +358,8 @@ namespace KoboRack.Core.Services
             int count = 0;
             try
             {
-                var result =  _unitOfWork.WalletFundingRepository.GetAll();
-                foreach (var item in result) 
+                var result = _unitOfWork.WalletFundingRepository.GetAll();
+                foreach (var item in result)
                 {
                     if (item.TransactionType == TransactionType.Debit)
                         count += 1;
@@ -216,7 +381,38 @@ namespace KoboRack.Core.Services
                 };
             }
             catch (Exception ex)
-            {              
+            {
+                SetErrorResponse(response, ex.Message, 500);
+            }
+            return response;
+        }
+
+        public async Task<ResponseDto<string>> DeletePersonalSavings(string personalSavingsId, string userId)
+        {
+            var response = new ResponseDto<string>();
+
+            try
+            {
+                var user = await _userManager.FindByEmailAsync(userId);
+
+                if (user == null)
+                {
+                    SetErrorResponse(response, "User not found", 404);
+                    return response;
+                }
+
+                var personalSavings = await _savingRepository.GetSavingByIdAsync(personalSavingsId);
+
+                if (personalSavings == null)
+                {
+                    SetNotFoundResponse(response, "Personal savings details not found", 404);
+                    return response;
+                }
+                await _savingRepository.DeleteAsync(personalSavings);
+                SetSuccessResponse(response, "Savings deleted successfully", 200);
+            }
+            catch (Exception ex)
+            {
                 SetErrorResponse(response, ex.Message, 500);
             }
             return response;

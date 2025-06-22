@@ -64,6 +64,25 @@ namespace KoboRack.Core.Services
             }
         }
 
+        public static string GeneratePasswordResetEmailBody(string resetPasswordUrl)
+        {
+            return $@"
+                <p>Hi there,</p>
+                <p>We received a request to reset your password for your Koborack account.</p>
+                <p>You can reset your password by clicking the button below:</p>
+                <div style='text-align: center; margin: 20px 0;'>
+                    <a href='{resetPasswordUrl}' style='
+                        display: inline-block;
+                        padding: 10px 20px;
+                        color: #ffffff;
+                        background-color: #007bff;
+                        text-decoration: none;
+                        border-radius: 5px;
+                    '>Reset Password</a>
+                </div>
+                <p>If you didn’t request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+                <p>Thanks,<br/>The Koborack Team</p>";
+        }
 
         public string GenerateOtpEmailBody(string otpCode)
         {

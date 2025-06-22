@@ -18,7 +18,7 @@ namespace KoboRack.Model.Entities
         public DateTime EndDate { get; set; }
         public DateTime TargetDate { get; set; }
         public DateTime WithdrawalDate { get; set; }
-        public DateTime NextRuntime { get; set; }
+        public DateTime? NextRuntime { get; set; }
         public string TargetName { get; set; }
         public decimal TargetAmount { get; set; }
         public string UserId { get; set; }

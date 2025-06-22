@@ -16,13 +16,13 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public async Task AddAsync(T entity)
         {
-           await _context.Set<T>().AddAsync(entity);
+            await _context.Set<T>().AddAsync(entity);
             await _context.SaveChangesAsync();
         }
         public T AddAsync2(T entity)
         {
-             _context.Set<T>().Add(entity);
-             _context.SaveChanges(); 
+            _context.Set<T>().Add(entity);
+            _context.SaveChanges(); 
             return entity;
         }
         public async Task DeleteAllAsync(List<T> entities)

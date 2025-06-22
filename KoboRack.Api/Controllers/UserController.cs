@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.PowerBI.Api.Models;
 using KoboRack.Core.IServices;
+using KoboRack.Model;
 
 namespace KoboRack.Api.Controllers
 {
@@ -28,6 +29,21 @@ namespace KoboRack.Api.Controllers
             }
 
             return StatusCode(response.StatusCode, new { errors = response.Errors });
+        }
+
+        [HttpPut("updateUserInformation")]
+        public async Task<IActionResult> UpdateUserInformation(string userId, IFormFile formFile)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new ApiResponse<string>(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
+            }
+            var response = await _userService.UpdateUserInformation(userId, formFile);
+
+            if (!response.Succeeded)
+                return StatusCode(response.StatusCode, response);
+
+            return Ok(response);
         }
 
         [HttpGet("NewRegisteredUserCount")]

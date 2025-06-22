@@ -12,6 +12,7 @@ namespace KoboRack.Api.AutoMapperProfile
             CreateMap<Kyc, KycRequestDto>().ReverseMap();
             CreateMap<KycResponseDto, Kyc>().ReverseMap();
             CreateMap<Saving, PersonalSavingsDTO>().ReverseMap();
+            CreateMap<Saving, GetUserSavingsDto>().ReverseMap();
             CreateMap<AppUser, AppUserDto>();
             CreateMap<AppUser, AppUserDto2>();
             CreateMap<GroupSavingsMembers, GroupMembersDto2>();

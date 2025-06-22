@@ -17,6 +17,5 @@ namespace KoboRack.Core.IServices
         Task<ApiResponse<string>> VerifyAndAuthenticateUserAsync(string idToken);
         Task<ApiResponse<string>> ConfirmEmailAsync(string userId, string token);
         Task<ApiResponse<string>> ResendEmailVerifyLink(string userId);
-        Task<ApiResponse<string>> UpdateUserInformation(string userId, IFormFile formFile);
     }
 }

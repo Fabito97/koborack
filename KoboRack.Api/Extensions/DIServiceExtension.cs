@@ -46,6 +46,10 @@ namespace KoboRack.Api.Extensions
             services.AddScoped<IWalletServices, WalletServices>();
             services.AddScoped<IWalletService, WalletService>();
             services.AddScoped<ITokenService, TokenService>();
+            services.AddScoped<IUserValidationService, UserValidationService>();
+            services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<ITransactionService, TransactionService>();
+            services.AddScoped<IAppUserTransactionRepository, AppUserTransactionRepository>();
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
