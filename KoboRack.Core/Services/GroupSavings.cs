@@ -178,8 +178,11 @@ namespace KoboRack.Core.Services
                         UserId = dto.UserId
                     };
                     var res = await _groupSavingsMembersRepository.CreateSavingsGroupMembersAsync(newGroupMember);
-                    var imageUrl = await _cloudinaryServices.UploadImage(result.Id, dto.FormFile);
-                    result.SafePortraitImageURL = imageUrl;
+                    if (dto.FormFile != null)
+                    {
+                        var imageUrl = await _cloudinaryServices.UploadImage(result.Id, dto.FormFile);
+                        result.SafePortraitImageURL = imageUrl;
+                    }
                     _unitOfWork.GroupRepository.UpdateGroupAsync(result);
                     _unitOfWork.SaveChanges();
                     if (res)
@@ -216,26 +219,15 @@ namespace KoboRack.Core.Services
             try
             { 
                 var ongoingGroups = _unitOfWork.GroupRepository.GetAll(groupDto => groupDto.GroupStatus == GroupStatus.OnGoing);
-
-                if (ongoingGroups.Count > 0)
-                {
-                    var mappedActiveGroups = _IMapper.Map<List<GroupDTO>>(ongoingGroups);
+                    
+                var mappedActiveGroups = _IMapper.Map<List<GroupDTO>>(ongoingGroups);
                     return new ResponseDto<List<GroupDTO>>()
                     {
                         DisplayMessage = "Success",
                         Result = mappedActiveGroups,
                         StatusCode = 200
-                    };
-                }
-                else
-                {
-                    return new ResponseDto<List<GroupDTO>>()
-                    {
-                        DisplayMessage = "No Active savings group found",
-                        Result = null,
-                        StatusCode = 404
-                    };
-                }
+                    };                
+               
             }
             catch (Exception ex)
             {

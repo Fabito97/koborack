@@ -2,6 +2,7 @@
 using KoboRack.Data.Context;
 using KoboRack.Model;
 using KoboRack.Model.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -20,18 +21,30 @@ namespace KoboRack.Core.Services
     public class TokenService : ITokenService
     {
         private readonly IConfiguration _config;
+        private readonly UserManager<AppUser> _userManager;
 
         private readonly SaviDbContext _dbContext;
 
-        public TokenService(IConfiguration config, SaviDbContext dbContext)
+        public TokenService(IConfiguration config, SaviDbContext dbContext, UserManager<AppUser> userManager)
         {
             _config = config;
             _dbContext = dbContext;
+            _userManager = userManager;
         }
 
-        public JwtSecurityToken GetToken(List<Claim> authClaims)
+        public async Task<string> GetToken(AppUser user)
         {
+            var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
+            var authClaims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(ClaimTypes.Role, role),
+            };
+
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Secret"]));
+
             var token = new JwtSecurityToken(
                 issuer: _config["JwtSettings:ValidIssuer"],
                 audience: _config["JwtSettings:ValidAudience"],
@@ -39,7 +52,8 @@ namespace KoboRack.Core.Services
                 claims: authClaims,
                 signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
             );
-            return token;
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
         public string GenerateOtp(string userId, int length = 6)
@@ -73,7 +87,7 @@ namespace KoboRack.Core.Services
 
             if (otp == null)
             {
-                return ApiResponse<string>.Failed(false, "Unauthorized", 401, null);
+                return ApiResponse<string>.Failed(false, "Unathorized, Otp token not found", 401, null);
             }
 
             // Check expiry: OTP older than 10 minutes
@@ -95,8 +109,6 @@ namespace KoboRack.Core.Services
 
             return ApiResponse<string>.Success(token, "OTP verified", 200);
         }
-
-
 
     }
 }

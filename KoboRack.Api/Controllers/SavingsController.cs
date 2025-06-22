@@ -53,6 +53,28 @@ namespace KoboRack.Api.Controllers
             };
         }
 
+        [HttpPut("{goalId}")]
+        public async Task<IActionResult> UpdateGoal(string goalId, [FromForm] PersonalSavingsDTO saving)
+        {
+            var response = await _personalSavings.UpdatePersonalSavings(saving.UserId, saving);
+            if (response.StatusCode == 200)
+            {
+                return Ok(response);
+            }
+            return BadRequest(response);
+        }
+        
+        [HttpDelete("{goalId}")]
+        public async Task<IActionResult> DeleteGoal(string goalId, [FromQuery] string userId)
+        {
+            var response = await _personalSavings.DeletePersonalSavings(goalId, userId);
+            if (response.StatusCode == 200)
+            {
+                return Ok(response);
+            }
+            return BadRequest(response);
+        }
+
         [HttpGet("totalGoalAmount/{userId}")]
         public async Task<IActionResult> GetTotalGoalAmountByUser(string userId)
         {

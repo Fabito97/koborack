@@ -37,7 +37,11 @@ namespace KoboRack.Core.Services
                 {
                     throw new Exception("Target already achieved");
                 }
-                DateTime nextRuntime = saving.NextRuntime.Date;
+                if (!saving.NextRuntime.HasValue)
+                {
+                    break;
+                }
+                DateTime nextRuntime = saving.NextRuntime.Value;
                 DateTime currentDate = DateTime.Now.Date;
 
                 int comparisonResult = nextRuntime.Date.CompareTo(currentDate);

@@ -49,6 +49,7 @@ namespace KoboRack.Core.Services
             _cloudinaryServices = cloudinaryServices;
             _tokenService = tokenService;
         }
+
         public async Task<ApiResponse<string>> LoginAsync(AppUserLoginDTO loginDTO)
         {
             try
@@ -63,16 +64,9 @@ namespace KoboRack.Core.Services
                 }
                 if (await _userManager.CheckPasswordAsync(user, loginDTO.Password))
                 {
-                    var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
-                    var authClaims = new List<Claim>
-                    {
-                        new Claim(ClaimTypes.Name, user.Email),
-                        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                        new Claim(ClaimTypes.NameIdentifier, user.Id),
-                        new Claim(ClaimTypes.Role, role),
-                    };
-                    var jwtToken = _tokenService.GetToken(authClaims);
-                    return ApiResponse<string>.Success(new JwtSecurityTokenHandler().WriteToken(jwtToken), "Login successful", 200);
+                    
+                    var jwtToken = await _tokenService.GetToken(user);
+                    return ApiResponse<string>.Success(jwtToken, "Login successful", 200);
                 }
                 return ApiResponse<string>.Failed(false, "Invalid Email or password.", 400, new List<string> { "Invalid Email or password." });
             }
@@ -183,7 +177,7 @@ namespace KoboRack.Core.Services
                 {
                     ToEmail = email,
                     Subject = "Koborack Password Reset Instructions",
-                    Body = $"Please reset your password by clicking <a href='{resetPasswordUrl}'>here</a>."
+                    Body = EmailServices.GeneratePasswordResetEmailBody(resetPasswordUrl)
                 };
                 await _emailServices.SendHtmlEmailAsync(mailRequest);
 
@@ -294,14 +288,7 @@ namespace KoboRack.Core.Services
 
             return ApiResponse<string>.Success(token, "OTP verified", 200);
         }
-
         
-        //private string GenerateEmailConfirmationLink(string userId, string token)
-        //{
-        //    string confirmationLink = $"http://localhost:3000/EmailVerifiedModal?userId={userId}&token={token}";
-        //    return confirmationLink;
-        //}
-
         public async Task<ApiResponse<string>> ResendEmailVerifyLink(string userId)
         {
             try
@@ -380,14 +367,9 @@ namespace KoboRack.Core.Services
                     if (result.Succeeded)
                     {
                         await _signInManager.SignInAsync(newUser, isPersistent: false);
-                        var claims = new List<Claim>
-                        {
-                            new Claim(ClaimTypes.NameIdentifier, newUser.Id),
-                            new Claim(ClaimTypes.Name, userName)
-                        };
-                        var jwtToken = _tokenService.GetToken(claims);
-                        var token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
-                        return new ApiResponse<string>(true, "User created and authenticated successfully on the server side", StatusCodes.Status200OK, token);
+                        
+                        var jwtToken = await _tokenService.GetToken(newUser);
+                        return new ApiResponse<string>(true, "User created and authenticated successfully on the server side", StatusCodes.Status200OK, jwtToken);
                     }
                     else
                     {
@@ -397,14 +379,9 @@ namespace KoboRack.Core.Services
                 else
                 {
                     await _signInManager.SignInAsync(existingUser, isPersistent: false);
-                    var claims = new List<Claim>
-                        {
-                            new Claim(ClaimTypes.NameIdentifier, existingUser.Id),
-                            new Claim(ClaimTypes.Name, userName)
-                        };
-                    var jwtToken = _tokenService.GetToken(claims);
-                    var token = new JwtSecurityTokenHandler().WriteToken(jwtToken);
-                    return new ApiResponse<string>(true, "User authenticated successfully on the server side", StatusCodes.Status200OK, token);
+                   
+                    var jwtToken = await _tokenService.GetToken(existingUser);
+                    return new ApiResponse<string>(true, "User authenticated successfully on the server side", StatusCodes.Status200OK, jwtToken);
                 }
             }
             catch (Exception ex)
@@ -414,43 +391,12 @@ namespace KoboRack.Core.Services
             }
         }    
 
-        public async Task<ApiResponse<string>> UpdateUserInformation(string userId, IFormFile formFile)
-        {
-            try
-            {
-                ArgumentNullException.ThrowIfNull(nameof(userId));
-                ArgumentNullException.ThrowIfNull(nameof(formFile));
-
-                var userExist = await _saviDbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
-                if (userExist == null)
-                {
-                    return new ApiResponse<string>(false, "User not found", StatusCodes.Status404NotFound);
-                }
-
-                var image = await _cloudinaryServices.UploadImage(userId, formFile);
-
-                // Update user's image URL
-                userExist.ImageUrl = image;
-
-                var result = await _userManager.UpdateAsync(userExist);
-
-                if (result.Succeeded)
-                {
-                    return new ApiResponse<string>(true, "Account Updated successfully", StatusCodes.Status200OK);
-                }
-                return new ApiResponse<string>(false, "Failed to update account", StatusCodes.Status400BadRequest);
-            }
-            catch (ArgumentNullException ex)
-            {
-                _logger.LogError(ex, "Argument is null");
-                return new ApiResponse<string>(false, "Argument is null", StatusCodes.Status400BadRequest);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while updating user");
-                return new ApiResponse<string>(false, "Error occurred while updating user", StatusCodes.Status500InternalServerError);
-            }
-        }
+       
+        //private string GenerateEmailConfirmationLink(string userId, string token)
+        //{
+        //    string confirmationLink = $"http://localhost:3000/EmailVerifiedModal?userId={userId}&token={token}";
+        //    return confirmationLink;
+        //}
 
     }
 }

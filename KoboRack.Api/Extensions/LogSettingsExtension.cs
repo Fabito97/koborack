@@ -14,8 +14,7 @@ namespace KoboRack.Api.Configurations
                 // Add NLog without explicit configuration loading
                 loggingBuilder.AddNLog();
 
-
-                loggingBuilder.ClearProviders();
+                //loggingBuilder.AddConsole();
                 loggingBuilder.SetMinimumLevel(LogLevel.Trace);
             });
         }
