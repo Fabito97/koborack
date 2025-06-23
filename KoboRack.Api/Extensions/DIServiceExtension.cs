@@ -13,6 +13,7 @@ using KoboRack.Data.UnitOfWork;
 using KoboRack.Model.Entities;
 using KoboRack.Api.AutoMapperProfile;
 using Hangfire;
+using Hangfire.PostgreSql;
 
 namespace KoboRack.Api.Extensions
 {
@@ -39,7 +40,7 @@ namespace KoboRack.Api.Extensions
             .AddDefaultTokenProviders();
             services.AddScoped<IAdminService, AdminService>();
             services.AddDbContext<SaviDbContext>(options =>
-            options.UseSqlServer(config.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(config.GetConnectionString("DefaultConnection")));
             services.AddScoped<IPersonalSavings, PersonalSavings>();
             services.AddScoped<IGroupSavings, GroupSavings>();
             services.AddScoped<ISavingRepository, SavingRepository>();
@@ -71,7 +72,7 @@ namespace KoboRack.Api.Extensions
             //    return new WalletServices(configuration);
             //});
             services.AddTransient<WalletServices>();
-            services.AddHangfire(confi => confi.UseSqlServerStorage(config.GetConnectionString("DefaultConnection")));
+            services.AddHangfire(confi => confi.UsePostgreSqlStorage(config.GetConnectionString("DefaultConnection")));
             services.AddHangfireServer();
             services.AddScoped<IAutoSaveBackgroundService,AutoSaveBackgroundService>();
             services.AddScoped<IFundingAnalyticsBackgroundServices, FundingAnalyticsBackgroundServices>();
