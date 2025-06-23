@@ -16,6 +16,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{54BD9FF4-C8B8-4C08-A115-73DE186A11D9}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		Dockerfile = Dockerfile
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KoboRack.Test", "KoboRack.Test\KoboRack.Test.csproj", "{D9C04516-FBB1-4DB2-84DF-6FB1B69E9DFB}"
