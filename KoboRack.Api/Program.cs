@@ -18,9 +18,10 @@ namespace KoboRack.Api
             // Add services to the container.
             var configuration = builder.Configuration;
             builder.Services.AddLoggingConfiguration(configuration);
-            builder.Configuration
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables();
+
+            //builder.Configuration
+            //    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            //    .AddEnvironmentVariables();
 
             builder.Services.AddControllers()
             .AddJsonOptions(options =>
@@ -86,7 +87,7 @@ namespace KoboRack.Api
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI( c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "KoboRack v1"));
