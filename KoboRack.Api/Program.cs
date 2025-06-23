@@ -19,9 +19,9 @@ namespace KoboRack.Api
             var configuration = builder.Configuration;
             builder.Services.AddLoggingConfiguration(configuration);
 
-            //builder.Configuration
-            //    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-            //    .AddEnvironmentVariables();
+            builder.Configuration
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables();
 
             builder.Services.AddControllers()
             .AddJsonOptions(options =>
