@@ -16,6 +16,7 @@ namespace KoboRack.Api.Controllers
         {
             _fundingService = fundingService;
         }
+
         [HttpPost("CreditPersonalTarget")]
         public async Task<IActionResult> CreditPersonalTarget([FromBody] CreditSavingsTargetRequestDto request)
         {
@@ -35,6 +36,7 @@ namespace KoboRack.Api.Controllers
                 return StatusCode(500, "An error occurred while processing your request.");
             }
         }
+
         [HttpPost("DebitPersonalTarget")]
         public async Task<IActionResult> DebitPersonalTarget([FromBody] DebitSavingsTargetRequestDto request)
         {

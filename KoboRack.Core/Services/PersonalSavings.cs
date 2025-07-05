@@ -6,6 +6,7 @@ using KoboRack.Data.Repositories.Interface;
 using KoboRack.Model.Entities;
 using KoboRack.Model.Enums;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 
 namespace KoboRack.Core.Services
 {
@@ -16,26 +17,45 @@ namespace KoboRack.Core.Services
         private readonly ICloudinaryServices<Saving> _cloudinaryServices;
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ICurrentUserService _currentUser;
+        private readonly ILogger<PersonalSavings> _logger;
 
-        public PersonalSavings(ISavingRepository savingRepository, UserManager<AppUser> userManager, ICloudinaryServices<Saving> cloudinaryServices, IMapper mapper, IUnitOfWork unitOfWork)
+        public PersonalSavings(ISavingRepository savingRepository, UserManager<AppUser> userManager, ICloudinaryServices<Saving> cloudinaryServices, IMapper mapper, IUnitOfWork unitOfWork, ICurrentUserService currentUser, ILogger<PersonalSavings> logger)
         {
             _savingRepository = savingRepository;
             _cloudinaryServices = cloudinaryServices;
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _userManager = userManager;
+            _currentUser = currentUser;
+            _logger = logger;
         }
 
-        public async Task<ResponseDto<string>> SetPersonal_Savings_Target(PersonalSavingsDTO saving, string userId)
+        public async Task<ResponseDto<string>> SetUserGoal(PersonalSavingsDTO saving)
         {
-            var response = new ResponseDto<string>();
-
+                var response = new ResponseDto<string>();
             try
             {
-                // Validate amounts
-                if (saving.TargetAmount <= 0 || saving.AmountToAdd <= 0)
+                var userId = _currentUser.UserId;
+
+                if (string.IsNullOrEmpty(userId))
                 {
-                    SetErrorResponse(response, "TargetAmount and AmountToAdd must be greater than zero.", 400);
+                    SetErrorResponse(response, "Unathorized, User ID not found in token.", 401);
+                    return response;
+                }
+            
+                var user = await _userManager.FindByIdAsync(userId);
+
+                if (user == null)
+                {
+                    SetErrorResponse(response, "Unathorized, User not found", 401);
+
+                }
+           
+                // Validate amounts
+                if (saving.TargetAmount <= 0 || saving.AmountToAdd <= 0 || saving.AmountToAdd > saving.TargetAmount)
+                {
+                    SetErrorResponse(response, "TargetAmount must be greater than AmountToAdd, and both must be greater than zero.", 400);
                     return response;
                 }
 
@@ -43,7 +63,7 @@ namespace KoboRack.Core.Services
                 int numPayments = (int)Math.Ceiling(saving.TargetAmount / saving.AmountToAdd);
 
                 // Start from today
-                DateTime currentDate = DateTime.Today;
+                DateTime currentDate = DateTime.UtcNow.Date;
 
                 // Calculate EndDate
                 for (int i = 0; i < numPayments; i++)
@@ -77,7 +97,7 @@ namespace KoboRack.Core.Services
                 if (saving.AutoSave)
                 {
                     // Schedule next payment according to FundFrequency
-                    DateTime nextRuntime = DateTime.Today;
+                    DateTime nextRuntime = DateTime.UtcNow.Date;
                     switch (saving.FundFrequency)
                     {
                         case FundFrequency.Daily:
@@ -117,13 +137,12 @@ namespace KoboRack.Core.Services
                 if (saving.GoalUrl != null)
                 {
                     var goalUrl = await _cloudinaryServices.UploadImage(newGoal.Id, saving.GoalUrl);
-
                     newGoal.GoalUrl = goalUrl;
-                }
 
-                // Update record with goal URL
-                _savingRepository.UpdateAsync(newGoal);
-                await _savingRepository.SaveChangesAsync();
+                    // Update record with goal URL
+                    _savingRepository.UpdateAsync(newGoal);
+                    await _savingRepository.SaveChangesAsync();
+                }
 
                 // Return response
                 if (newTarget)
@@ -174,32 +193,50 @@ namespace KoboRack.Core.Services
             response.Result = default(T);
             response.StatusCode = statusCode;
         }
-        public async Task<ResponseDto<List<GetUserSavingsDto>>> Get_ListOf_All_UserTargets(string userId)
+
+        public async Task<ResponseDto<List<GetUserSavingsDto>>> GetUserGoals(string userId)
         {
             var response = new ResponseDto<List<GetUserSavingsDto>>();
 
+            var currentUserId = _currentUser.UserId;
+            var userRole = _currentUser.UserRole;
+
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(userRole))
+            {
+                SetErrorResponse(response, "Unauthorized, User ID or Role not found in token.", 401);
+                return response;
+            }
+
+            var currentUser = await _userManager.FindByIdAsync(userId);
+            if (currentUser == null)
+            {
+                SetErrorResponse(response, "Unauthorized, User not found", 401);
+                return response;
+            }
+
+            // Only allow if admin or accessing their own data
+            if (userRole != "Admin" && currentUserId != userId)
+            {
+                SetErrorResponse(response, "Unauthorized, access denied", 401);
+                return response;
+            }
+
             try
             {
-                var user = await _userManager.FindByIdAsync(userId);
-                if (user == null)
-                {
-                    SetNotFoundResponse(response, "User not found", 404);
-                }
                 var listOfTargets = await _savingRepository.GetAllSetSavingsByUserId(userId);
-
                 var savings = _mapper.Map<List<GetUserSavingsDto>>(listOfTargets);
 
                 SetSuccessResponse(response, "Targets retrieved successfully", savings, 200);
-
             }
             catch (Exception ex)
             {
-                SetErrorResponse(response, ex.Message, 500);
-
+                _logger.LogError(ex, "Failed to retrieve savings for user: {UserId}", userId);
+                SetErrorResponse(response, "An error occurred while retrieving data.", 500);
             }
 
             return response;
         }
+
 
         public async Task<ResponseDto<Saving>> GetPersonalSavingsById(string personalSavingsId)
         {
@@ -207,36 +244,19 @@ namespace KoboRack.Core.Services
 
             try
             {
-                var personalSavings = await _savingRepository.GetSavingByIdAsync(personalSavingsId);
+                var userId = _currentUser.UserId;
+                var userRole = _currentUser.UserRole;
 
-                if (personalSavings != null)
+                if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(userRole))
                 {
-                    SetSuccessResponse(response, "Personal savings details retrieved successfully", personalSavings, 200);
+                    SetErrorResponse(response, "Unauthorized, User ID or Role not found in token.", 401);
+                    return response;
                 }
-                else
+
+                var currentUser = await _userManager.FindByIdAsync(userId);
+                if (currentUser == null)
                 {
-                    SetNotFoundResponse(response, "Personal savings details not found", 404);
-                }
-            }
-            catch (Exception ex)
-            {
-                SetErrorResponse(response, ex.Message, 500);
-            }
-
-            return response;
-        }
-
-        public async Task<ResponseDto<Saving>> UpdatePersonalSavings(string personalSavingsId, PersonalSavingsDTO savings)
-        {
-            var response = new ResponseDto<Saving>();
-
-            try
-            {
-                var user = await _userManager.FindByEmailAsync(savings.UserId);
-
-                if (user == null)
-                {
-                    SetErrorResponse(response, "User not found", 404);
+                    SetErrorResponse(response, "Unauthorized, User not found", 401);
                     return response;
                 }
 
@@ -245,6 +265,60 @@ namespace KoboRack.Core.Services
                 if (personalSavings == null)
                 {
                     SetNotFoundResponse(response, "Personal savings details not found", 404);
+                    return response;
+                }
+
+                // Only allow if admin or accessing their own savings
+                if (userRole != "Admin" && userId != personalSavings.UserId)
+                {
+                    SetErrorResponse(response, "Unauthorized, access denied", 401);
+                    return response;
+                }
+
+                SetSuccessResponse(response, "Personal savings details retrieved successfully", personalSavings, 200);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving savings for ID: {SavingId}", personalSavingsId);
+                SetErrorResponse(response, "An error occurred while retrieving savings data", 500);
+            }
+
+            return response;
+        }
+
+
+        public async Task<ResponseDto<Saving>> UpdatePersonalSavings(string personalSavingsId, PersonalSavingsDTO savings)
+        {
+            var response = new ResponseDto<Saving>();
+
+            try
+            {
+                var userId = _currentUser.UserId;
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    SetErrorResponse(response, "Unauthorized, User ID not found in token.", 401);
+                    return response;
+                }
+
+                var user = await _userManager.FindByIdAsync(userId);
+                if (user == null)
+                {
+                    SetErrorResponse(response, "Unauthorized, User not found", 401);
+                    return response;
+                }
+                                
+                var personalSavings = await _savingRepository.GetSavingByIdAsync(personalSavingsId);
+
+                if (personalSavings == null)
+                {
+                    SetNotFoundResponse(response, "Personal savings details not found", 404);
+                    return response;
+                }
+
+                if (personalSavings.UserId != userId)
+                {
+                    SetErrorResponse(response, "Unauthorized: You can only update your own savings.", 401);
                     return response;
                 }
 
@@ -269,16 +343,16 @@ namespace KoboRack.Core.Services
                 switch (personalSavings.FundFrequency)
                 {
                     case FundFrequency.Daily:
-                        endDate = DateTime.Now.AddDays((double)cyclesNeeded);
+                        endDate = DateTime.UtcNow.AddDays((double)cyclesNeeded);
                         break;
 
                     case FundFrequency.Weekly:
-                        endDate = DateTime.Now.AddDays((double)cyclesNeeded * 7);
+                        endDate = DateTime.UtcNow.AddDays((double)cyclesNeeded * 7);
                         break;
 
                     case FundFrequency.Monthly:
                         int monthsNeeded = (int)Math.Ceiling(cyclesNeeded);
-                        endDate = DateTime.Now.AddMonths(monthsNeeded);
+                        endDate = DateTime.UtcNow.AddMonths(monthsNeeded);
                         break;
 
                     default:
@@ -294,22 +368,22 @@ namespace KoboRack.Core.Services
                     switch (personalSavings.FundFrequency)
                     {
                         case FundFrequency.Daily:
-                            personalSavings.NextRuntime = DateTime.Now.AddDays(1);
+                            personalSavings.NextRuntime = DateTime.UtcNow.AddDays(1);
                             break;
 
                         case FundFrequency.Weekly:
-                            personalSavings.NextRuntime = DateTime.Now.AddDays(7);
+                            personalSavings.NextRuntime = DateTime.UtcNow.AddDays(7);
                             break;
 
                         case FundFrequency.Monthly:
-                            personalSavings.NextRuntime = DateTime.Now.AddMonths(1);
+                            personalSavings.NextRuntime = DateTime.UtcNow.AddMonths(1);
                             break;
                     }
                 }
                 else
                 {
                     // For manual savings, we can set to a past date or nullable
-                    personalSavings.NextRuntime = DateTime.Now.AddDays(-1);
+                    personalSavings.NextRuntime = DateTime.UtcNow.AddDays(-1);
                 }
 
                 _savingRepository.UpdateAsync(personalSavings);
@@ -318,16 +392,40 @@ namespace KoboRack.Core.Services
             }
             catch (Exception ex)
             {
-                SetErrorResponse(response, ex.Message, 500);
+                _logger.LogError(ex, "Error updating savings for ID: {SavingId}", personalSavingsId);
+                SetErrorResponse(response, "An error occurred while updating savings goal", 500);
             }
 
             return response;
         }
 
 
-        public async Task<ResponseDto<decimal>> GetTotalGoalAmountByUser(string userId)
+        public async Task<ResponseDto<decimal>> GetUserTotalGoalAmount(string userId)
         {
             var response = new ResponseDto<decimal>();
+
+            var currentUserId = _currentUser.UserId;
+            var userRole = _currentUser.UserRole;
+
+            if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(userRole))
+            {
+                SetErrorResponse(response, "Unauthorized, User ID or Role not found in token.", 401);
+                return response;
+            }
+
+            var currentUser = await _userManager.FindByIdAsync(userId);
+            if (currentUser == null)
+            {
+                SetErrorResponse(response, "Unauthorized, User not found", 401);
+                return response;
+            }
+
+            // Only allow if admin or accessing their own data
+            if (userRole != "Admin" && currentUserId != userId)
+            {
+                SetErrorResponse(response, "Unauthorized, access denied", 401);
+                return response;
+            }
 
             try
             {
@@ -345,7 +443,8 @@ namespace KoboRack.Core.Services
             }
             catch (Exception ex)
             {
-                SetErrorResponse(response, ex.Message, 500);
+                _logger.LogError(ex, "Error retrieving user total savings Amount for user with ID: {userId}", userId);
+                SetErrorResponse(response, "An error occurred while retrieving user total savings Amount", 500);
             }
 
             return response;
@@ -387,33 +486,40 @@ namespace KoboRack.Core.Services
             return response;
         }
 
-        public async Task<ResponseDto<string>> DeletePersonalSavings(string personalSavingsId, string userId)
+        public async Task<ResponseDto<string>> DeletePersonalSavings(string personalSavingsId)
         {
             var response = new ResponseDto<string>();
 
-            try
+            var userId = _currentUser.UserId;
+            if (string.IsNullOrEmpty(userId))
             {
-                var user = await _userManager.FindByEmailAsync(userId);
+                SetErrorResponse(response, "Unauthorized, User ID not found in token.", 401);
+                return response;
+            }
 
+            try
+            {  
+                var user = await _userManager.FindByIdAsync(userId);
                 if (user == null)
                 {
-                    SetErrorResponse(response, "User not found", 404);
+                    SetErrorResponse(response, "Unauthorized, User not found", 401);
                     return response;
                 }
 
                 var personalSavings = await _savingRepository.GetSavingByIdAsync(personalSavingsId);
-
                 if (personalSavings == null)
                 {
                     SetNotFoundResponse(response, "Personal savings details not found", 404);
                     return response;
                 }
+
                 await _savingRepository.DeleteAsync(personalSavings);
                 SetSuccessResponse(response, "Savings deleted successfully", 200);
             }
             catch (Exception ex)
             {
-                SetErrorResponse(response, ex.Message, 500);
+                _logger.LogError(ex, "Error deleting user goal with ID: {personalSavingsId}", personalSavingsId);
+                SetErrorResponse(response, "An error occurred while deleting goal total savings Amount", 500);
             }
             return response;
         }

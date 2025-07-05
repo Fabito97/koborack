@@ -2,10 +2,10 @@
 using CloudinaryDotNet;
 using Microsoft.AspNetCore.Http;
 using KoboRack.Core.IServices;
-using KoboRack.Model.Entities;
 using Microsoft.Extensions.Configuration;
 using KoboRack.Data.Repositories.Interface;
 using Microsoft.Extensions.Logging;
+using KoboRack.Model.Commons;
 
 namespace KoboRack.Core.Services
 {

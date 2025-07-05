@@ -158,12 +158,20 @@ namespace KoboRack.Data.Migrations
                     b.Property<string>("Reference")
                         .HasColumnType("text");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<int>("TransactionType")
                         .HasColumnType("integer");
+
+                    b.Property<string>("WalletId")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AppUserId");
+
+                    b.HasIndex("WalletId");
 
                     b.ToTable("AppUserTransactions");
                 });
@@ -226,7 +234,7 @@ namespace KoboRack.Data.Migrations
                     b.Property<decimal>("Savings")
                         .HasColumnType("numeric");
 
-                    b.Property<decimal>("Withrawal")
+                    b.Property<decimal>("Withdrawal")
                         .HasColumnType("numeric");
 
                     b.HasKey("Id");
@@ -350,6 +358,9 @@ namespace KoboRack.Data.Migrations
                     b.Property<int>("Positions")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("TotalContributed")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("UserId")
                         .HasColumnType("text");
 
@@ -387,6 +398,9 @@ namespace KoboRack.Data.Migrations
 
                     b.Property<string>("Reference")
                         .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<int>("TransactionType")
                         .HasColumnType("integer");
@@ -596,6 +610,8 @@ namespace KoboRack.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AppUserId");
+
                     b.ToTable("Wallets");
                 });
 
@@ -791,9 +807,17 @@ namespace KoboRack.Data.Migrations
 
             modelBuilder.Entity("KoboRack.Model.Entities.AppUserTransaction", b =>
                 {
-                    b.HasOne("KoboRack.Model.Entities.AppUser", null)
+                    b.HasOne("KoboRack.Model.Entities.AppUser", "AppUser")
                         .WithMany("AppUserTransactions")
                         .HasForeignKey("AppUserId");
+
+                    b.HasOne("KoboRack.Model.Entities.Wallet", "Wallet")
+                        .WithMany()
+                        .HasForeignKey("WalletId");
+
+                    b.Navigation("AppUser");
+
+                    b.Navigation("Wallet");
                 });
 
             modelBuilder.Entity("KoboRack.Model.Entities.CardDetail", b =>
@@ -821,6 +845,15 @@ namespace KoboRack.Data.Migrations
                         .HasForeignKey("UserId");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("KoboRack.Model.Entities.Wallet", b =>
+                {
+                    b.HasOne("KoboRack.Model.Entities.AppUser", "AppUser")
+                        .WithMany("Wallets")
+                        .HasForeignKey("AppUserId");
+
+                    b.Navigation("AppUser");
                 });
 
             modelBuilder.Entity("KoboRack.Model.Entities.WalletFunding", b =>
@@ -890,6 +923,8 @@ namespace KoboRack.Data.Migrations
                     b.Navigation("GroupTransactions");
 
                     b.Navigation("Savings");
+
+                    b.Navigation("Wallets");
                 });
 
             modelBuilder.Entity("KoboRack.Model.Entities.Group", b =>

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿using KoboRack.Model.Commons;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace KoboRack.Model.Entities
 {

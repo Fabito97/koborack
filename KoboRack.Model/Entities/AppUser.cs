@@ -19,6 +19,7 @@ namespace KoboRack.Model.Entities
         public ICollection<AppUserTransaction> AppUserTransactions { get; set; }
         public ICollection<Group> Groups { get; set; }
         public ICollection<GroupTransaction> GroupTransactions { get; set; }
+        public ICollection<Wallet> Wallets { get; set; }
         public bool IsActive { get; set; }
         //For email confirmation
         public string EmailConfirmationToken { get; set; }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KoboRack.Model.Commons;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,7 +17,10 @@ namespace KoboRack.Model.Entities
 
         public int Positions { get; set; }
 
+        public decimal TotalContributed { get; set; }
+
         public DateTime LastsavingDate { get; set; }
+
         public bool IsPaid { get; set; }
 
     }

@@ -3,9 +3,9 @@ using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using KoboRack.Core.IServices;
-using KoboRack.Model.Entities;
 using System.Security.Cryptography;
 using System.Text;
+using KoboRack.Model.Commons;
 
 namespace KoboRack.Core.Services
 {

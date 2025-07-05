@@ -14,6 +14,7 @@ using KoboRack.Model.Entities;
 using KoboRack.Api.AutoMapperProfile;
 using Hangfire;
 using Hangfire.PostgreSql;
+using KoboRack.Model.Commons;
 
 namespace KoboRack.Api.Extensions
 {
@@ -50,6 +51,8 @@ namespace KoboRack.Api.Extensions
             services.AddScoped<IUserValidationService, UserValidationService>();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
             services.AddScoped<ITransactionService, TransactionService>();
+            services.AddScoped<IPaystackCustomerService, PaystackCustomerService>();
+            services.AddScoped<IPaystackWebhookService, PaystackWebhookService>();
             services.AddScoped<IAppUserTransactionRepository, AppUserTransactionRepository>();
             services.AddAuthentication(options =>
             {

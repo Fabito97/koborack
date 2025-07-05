@@ -1,5 +1,5 @@
 ﻿using MimeKit;
-using KoboRack.Model.Entities;
+using KoboRack.Model.Commons;
 namespace KoboRack.Core.IServices
 {
     public interface IEmailServices
