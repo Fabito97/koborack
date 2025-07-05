@@ -1,5 +1,7 @@
 ﻿using KoboRack.Core.IServices;
+using KoboRack.Model.Entities;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,16 +13,22 @@ namespace KoboRack.Core.Services
 {
     public class CurrentUserService : ICurrentUserService
     {
+        private readonly UserManager<AppUser> _userManager;
+
         public CurrentUserService(
-            IHttpContextAccessor httpContextAccessor)
+            IHttpContextAccessor httpContextAccessor, UserManager<AppUser> userManager)
         {
-            UserId = httpContextAccessor.HttpContext?.User?.FindFirstValue("Id");
-            UserRole = httpContextAccessor.HttpContext?.User?.FindFirstValue("Role");
-            UserEmail = httpContextAccessor.HttpContext?.User?.FindFirstValue("Email");
+            var user = httpContextAccessor.HttpContext?.User;
+            UserId = user?.FindFirstValue(ClaimTypes.NameIdentifier); // maps to "nameidentifier"
+            UserRole = user?.FindFirstValue(ClaimTypes.Role); // maps to "role"
+            UserEmail = user?.FindFirstValue(ClaimTypes.Name); // maps to "name"
+
             FullName = httpContextAccessor.HttpContext?.User?.FindFirstValue("FirstName")
                        + " " + httpContextAccessor.HttpContext?.User?.FindFirstValue("LastName");
             UserPhoneNumber = httpContextAccessor.HttpContext?.User?.FindFirstValue("PhoneNumber");
             UserType = httpContextAccessor.HttpContext?.User?.FindFirstValue("UserType");
+
+            _userManager = userManager;
         }
 
         public string? UserId { get; }
@@ -29,5 +37,10 @@ namespace KoboRack.Core.Services
         public string FullName { get; }
         public string? UserPhoneNumber { get; set; }
         public string? UserType { get; set; }
+
+        public async Task<AppUser> GetCurrentUserAsync()
+        {
+            return await _userManager.FindByIdAsync(UserId);
+        }
     }
 }

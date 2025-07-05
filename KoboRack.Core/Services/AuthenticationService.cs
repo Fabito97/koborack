@@ -18,6 +18,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using static System.Net.WebRequestMethods;
+using KoboRack.Model.Commons;
 
 namespace KoboRack.Core.Services
 {
@@ -140,7 +141,6 @@ namespace KoboRack.Core.Services
                     Subject = "Your Email Confirmation One-Time Password (OTP)",
                     Body = _emailService.GenerateOtpEmailBody(otpToken)
                 };
-                await services.CreateWallet(appUser.Id);
                 await _emailService.SendHtmlEmailAsync(mailRequest);
                 return ApiResponse<object>.Success(new { appUser.Id, appUser.Email }, "Registration successful. Please check your email for confirmation instructions.", StatusCodes.Status200OK);
 
@@ -252,43 +252,48 @@ namespace KoboRack.Core.Services
         public async Task<ApiResponse<string>> ConfirmEmailAsync(string userId, string token)
         {
             var user = await _userManager.FindByIdAsync(userId);
-
             if (user == null)
-            {
-                return new ApiResponse<string>(false, "Unathorized, user not found.", StatusCodes.Status400BadRequest);
-            }
+                return ApiResponse<string>.Failed(false, "Unauthorized, user not found.", StatusCodes.Status400BadRequest, null);
 
-            var otp = await _saviDbContext.Otps.FirstOrDefaultAsync(o => o.AppUserId == userId);
+            var otp = await _saviDbContext.Otps
+                .FirstOrDefaultAsync(o => o.AppUserId == userId && !o.IsUsed);
 
             if (otp == null)
-            {
-                return ApiResponse<string>.Failed(false, "Unauthorized, No otp issued", StatusCodes.Status401Unauthorized, null);
-            }
+                return ApiResponse<string>.Failed(false, "Unauthorized, No OTP issued", StatusCodes.Status401Unauthorized, null);
 
-            // Check expiry: OTP older than 10 minutes
-            if (otp.IsUsed || DateTime.UtcNow - otp.CreatedAt > TimeSpan.FromMinutes(10))
-            {
-                return ApiResponse<string>.Failed(false, "OTP expired", StatusCodes.Status401Unauthorized, null);
-            }
+            var lastChanged = otp?.ModifiedAt ?? otp.CreatedAt;
+            if (DateTime.UtcNow - lastChanged > TimeSpan.FromMinutes(10))
+                return ApiResponse<string>.Failed(false, "OTP expired", StatusCodes.Status401Unauthorized, null);            
 
-            // Hash the incoming token and compare
             var hashedToken = TokenService.HashOtp(token);
             if (!string.Equals(otp.Value, hashedToken, StringComparison.Ordinal))
-            {
                 return ApiResponse<string>.Failed(false, "Invalid OTP", StatusCodes.Status400BadRequest, null);
-            }
 
-            // Optional: delete OTP after successful use
-            _saviDbContext.Otps.Remove(otp);
-            await _saviDbContext.SaveChangesAsync();
-
+            // ✅ Mark OTP as used and confirm email
+            otp.IsUsed = true;
+            //otp.Value = null;
             user.EmailConfirmed = true;
             user.EmailConfirmationToken = null;
+
+            await _saviDbContext.SaveChangesAsync();
             await _userManager.UpdateAsync(user);
 
-            return ApiResponse<string>.Success(token, "OTP verified", 200);
+            try
+            {
+                // 🏦 Create wallet and link Paystack customer
+                var response = await services.CreateWallet(user);
+                if (!response.Succeeded)
+                    return ApiResponse<string>.Success(token, response.Message, StatusCodes.Status200OK);
+                
+                return ApiResponse<string>.Success(token, "OTP verified and wallet created", StatusCodes.Status200OK);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Wallet or Paystack customer creation failed.");
+                return ApiResponse<string>.Failed(false, "Email confirmed but wallet setup failed. Contact support.", StatusCodes.Status500InternalServerError, new List<string> { ex.Message });
+            }
         }
-        
+
         public async Task<ApiResponse<string>> ResendEmailVerifyLink(string userId)
         {
             try

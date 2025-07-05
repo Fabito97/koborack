@@ -9,6 +9,7 @@ namespace KoboRack.Api.Extensions
         public static void AddAuthenticationConfiguration(this IServiceCollection serviceCollection, IConfiguration configuration)
         {
             var secretKey = configuration.GetSection("JwtSettings:Secret");
+            var issuer = configuration["JwtSettings:ValidIssuer"];
 
             var TokenParameters = new TokenValidationParameters
             {
@@ -17,7 +18,7 @@ namespace KoboRack.Api.Extensions
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidAudience = configuration["JwtSettings:ValidAudience"],
-                ValidIssuer = configuration["JwtSettings:ValidIssuer"],
+                ValidIssuer = issuer,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding
                     .UTF8.GetBytes(secretKey.Value)),
                 ClockSkew = TimeSpan.Zero
@@ -34,6 +35,13 @@ namespace KoboRack.Api.Extensions
                 options.SaveToken = true;
                 options.TokenValidationParameters = TokenParameters;
             });
+
+            var logger = LoggerFactory.Create(logging =>
+            {
+                logging.AddConsole();
+            }).CreateLogger("Startup");
+
+            logger.LogInformation("JWT Issuer: {JwtIssuer}", issuer);
         }
     }
 }

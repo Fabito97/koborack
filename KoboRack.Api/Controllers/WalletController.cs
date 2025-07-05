@@ -3,9 +3,11 @@ using KoboRack.Core.DTO;
 using KoboRack.Core.IServices;
 using KoboRack.Core.Services;
 using KoboRack.Model;
+using Microsoft.AspNetCore.Authorization;
 
 namespace KoboRack.Api.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WalletController : ControllerBase
@@ -19,11 +21,14 @@ namespace KoboRack.Api.Controllers
 			_walletService = walletService;
         }
 
-        [HttpGet]
-        [Route("api/paystack/verify/{referenceCode}/{userId}")]
-        public async Task<IActionResult> VerifyPayment(string referenceCode, string userId)
+        [HttpPost]
+        [Route("paystack/verify/{referenceCode}")]
+        public async Task<IActionResult> VerifyPayment(string referenceCode)
         {
-            var result = await _walletServices.VerifyTransaction(referenceCode, userId);
+            var result = await _walletServices.VerifyTransaction(referenceCode);
+
+            if (!result.Succeeded) 
+                return BadRequest();
 
             return Ok(result);
         }
@@ -57,7 +62,7 @@ namespace KoboRack.Api.Controllers
 			return Ok(await _walletService.GetWalletByNumber(number));
 		}
 
-
+        
 		[HttpPost("FundWallet")]
 		public async Task<IActionResult> FundWallet(FundWalletDto fundWalletDto)
 		{
@@ -66,7 +71,7 @@ namespace KoboRack.Api.Controllers
 				return BadRequest(ApiResponse<string>.Failed(false, "Invalid model state.", StatusCodes.Status400BadRequest, ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage).ToList()));
 			}
 
-			return Ok(await _walletService.FundWallet(fundWalletDto));
+			return Ok(await _walletService.FundWalletAsync(fundWalletDto));
 		}
 
         [HttpGet("totalbalance")]

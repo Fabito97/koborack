@@ -6,6 +6,7 @@ using KoboRack.Data.Repositories.Interface;
 using KoboRack.Model;
 using KoboRack.Model.Entities;
 using KoboRack.Model.Enums;
+using KoboRack.Core.DTO.PaystackDto;
 
 namespace KoboRack.Core.Services
 {
@@ -14,59 +15,79 @@ namespace KoboRack.Core.Services
 
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        public WalletService(IUnitOfWork unitOfWork, IMapper mapper)
+        private readonly ICurrentUserService _currentUserService;
+        private readonly IPaystackCustomerService _customerService;
+        public WalletService(IUnitOfWork unitOfWork, IMapper mapper, ICurrentUserService currentUserService, IPaystackCustomerService customerService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            _currentUserService = currentUserService;
+            _customerService = customerService;
         }
 
 
-		public async Task<ApiResponse<CreditResponseDto>> FundWallet(FundWalletDto fundWalletDto)
-		{
-			try
-			{
-				var response = await GetWalletByNumber(fundWalletDto.WalletNumber);
+        public async Task<ApiResponse<CreditResponseDto>> FundWalletAsync(FundWalletDto fundWalletDto)
+        {
+            var userId = _currentUserService.UserId;
+            try
+            {
+                if (userId == null)
+                    throw new UnauthorizedAccessException("User Id not found in token");
 
-				if (!response.Succeeded)
-				{
-					return ApiResponse<CreditResponseDto>.Failed(false, response.Message, response.StatusCode, response.Errors);
-				}
+                var user = await _currentUserService.GetCurrentUserAsync();
 
-				var wallet = response.Data;
-				decimal bal = wallet.Balance + fundWalletDto.FundAmount;
-				wallet.Balance = bal;
-				_unitOfWork.WalletRepository.UpdateAsync(wallet);
-				_unitOfWork.SaveChanges();
+                if (user == null)
+                    return ApiResponse<CreditResponseDto>.Failed(false, "User not found", 401, null);
 
-				var walletFunding = new WalletFunding
-				{
-					FundAmount = fundWalletDto.FundAmount,
-					Narration = fundWalletDto.Naration,
-					TransactionType = TransactionType.Credit,
-					WalletId = wallet.Id
+                var wallet = _unitOfWork.WalletRepository.FindAsync(w => w.AppUserId == userId).FirstOrDefault();
 
-				};
-				await _unitOfWork.WalletFundingRepository.AddAsync(walletFunding);
-				_unitOfWork.SaveChanges();
+                //var walletResponse = await GetWalletByNumber(fundWalletDto.WalletNumber);
+                if (wallet == null)
+                {
+                    return ApiResponse<CreditResponseDto>.Failed(false, "User wallet not found", 404, null);
+                }
 
+                var reference = $"FUND_{Guid.NewGuid():N}".ToLower();
 
-				var creditResponse = new CreditResponseDto
-				{
-					WalletNumber = fundWalletDto.WalletNumber,
-					Balance = bal,
-					Message = "Your account has been credited successfully.",
-				};
+                // 2. Record Ledger Transaction
+                var walletTransaction = new AppUserTransaction
+                {
+                    WalletId = wallet.Id,
+                    Amount = fundWalletDto.FundAmount,
+                    TransactionType = TransactionType.Credit,
+                    Status = TransactionStatus.Pending,
+                    Reference = reference,
+                    Description = fundWalletDto.Naration ?? "Wallet top-up pending via card"
+                };
+                await _unitOfWork.AppUserTransactionRepository.AddAsync(walletTransaction);
+                _unitOfWork.SaveChanges();
 
-				return ApiResponse<CreditResponseDto>.Success(creditResponse, "Wallet funded successfully", StatusCodes.Status200OK);
-			}
-			catch (Exception e)
-			{
-				return ApiResponse<CreditResponseDto>.Failed(false, "Failed to fund wallet. ", StatusCodes.Status400BadRequest, new List<string>() { e.InnerException.ToString() });
+                var paystackInit = await _customerService.InitiateWalletFundingAsync(user, walletTransaction, wallet.PaystackCustomerCode);
 
-			}
-		}
+                var responseDto = new CreditResponseDto
+                {
+                    WalletNumber = wallet.WalletNumber,
+                    Balance = wallet.Balance,
+                    Reference = reference,
+                    Message = "Payment initialized. Complete checkout to fund your wallet.",
+                    PaymentUrl = paystackInit.AuthorizationUrl,
+                    AccessCode = paystackInit.AccessCode
+                };
 
-		public async Task<ApiResponse<List<WalletResponseDto>>> GetAllWallets()
+                return ApiResponse<CreditResponseDto>.Success(responseDto, "Wallet funding initiated", StatusCodes.Status200OK);
+            }
+            catch (Exception ex)
+            {
+                var error = ex.InnerException?.Message ?? ex.Message;
+                return ApiResponse<CreditResponseDto>.Failed(
+                    false,
+                    "Failed to initiate wallet funding.",
+                    StatusCodes.Status500InternalServerError,
+                    new List<string> { error });
+            }
+        }
+
+        public async Task<ApiResponse<List<WalletResponseDto>>> GetAllWallets()
 		{
 			var wallets = _unitOfWork.WalletRepository.GetAll();
 			List<WalletResponseDto> result = new();

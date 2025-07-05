@@ -36,7 +36,7 @@ namespace KoboRack.Core.Services
                 var fundinAnalytics = new FundingAnalytics()
                 {
                     Savings = savings,
-                    Withrawal = withdrawals,
+                    Withdrawal = withdrawals,
                     Contribution = contributions
                 };
                 var result = await _unitOfWork.FundingAnalyticsRepository.CreateFundingAnalytics(fundinAnalytics);

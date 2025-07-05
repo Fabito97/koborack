@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using KoboRack.Model.Entities;
+using KoboRack.Model.Commons;
 
 namespace KoboRack.Data.Context
 {

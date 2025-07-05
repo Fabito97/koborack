@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KoboRack.Model.Entities;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,5 +15,7 @@ namespace KoboRack.Core.IServices
         string? UserPhoneNumber { get; set; }
         string FullName { get; }
         string? UserType { get; set; }
+
+        Task<AppUser> GetCurrentUserAsync();
     }
 }

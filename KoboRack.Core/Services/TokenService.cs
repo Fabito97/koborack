@@ -37,10 +37,13 @@ namespace KoboRack.Core.Services
             var role = (await _userManager.GetRolesAsync(user)).FirstOrDefault();
             var authClaims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, user.Email),
+                new Claim(ClaimTypes.Name, user.FirstName),
+                new Claim(ClaimTypes.Email, user.Email),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Role, role),
+                new Claim("emailConfirmed", user.EmailConfirmed.ToString()),
+                new Claim("phoneNumber", user.PhoneNumber),
             };
 
             var authSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["JwtSettings:Secret"]));

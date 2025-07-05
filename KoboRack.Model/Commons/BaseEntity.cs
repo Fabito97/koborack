@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 
-namespace KoboRack.Model.Entities
+namespace KoboRack.Model.Commons
 {
     public class BaseEntity
     {

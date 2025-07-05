@@ -1,4 +1,4 @@
-﻿namespace KoboRack.Model.Entities
+﻿namespace KoboRack.Model.Commons
 {
     public class MailRequest
     {

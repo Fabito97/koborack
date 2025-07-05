@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 using KoboRack.Core.DTO;
 using KoboRack.Core.IServices;
 using KoboRack.Model.Entities;
+using Microsoft.AspNetCore.Authorization;
 
 namespace KoboRack.Api.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class SavingsController : ControllerBase
@@ -18,10 +20,11 @@ namespace KoboRack.Api.Controllers
             _mapper = mapper;
         }
 
+        
         [HttpPost("SetGoal")]
         public async Task<IActionResult> AddMoreGoals([FromForm] PersonalSavingsDTO saving)
         {
-            var response = await _personalSavings.SetPersonal_Savings_Target(saving, saving.UserId);
+            var response = await _personalSavings.SetUserGoal(saving);
             if (response.StatusCode == 200)
             {
                 return Ok(response);
@@ -32,7 +35,7 @@ namespace KoboRack.Api.Controllers
         [HttpGet("listAllGoals/{UserId}")]
         public async Task<IActionResult> GetAllGoals(string UserId)
         {
-            var response = await _personalSavings.Get_ListOf_All_UserTargets(UserId);
+            var response = await _personalSavings.GetUserGoals(UserId);
             if (response.StatusCode == 200)
             {
                 return Ok(response);
@@ -56,7 +59,7 @@ namespace KoboRack.Api.Controllers
         [HttpPut("{goalId}")]
         public async Task<IActionResult> UpdateGoal(string goalId, [FromForm] PersonalSavingsDTO saving)
         {
-            var response = await _personalSavings.UpdatePersonalSavings(saving.UserId, saving);
+            var response = await _personalSavings.UpdatePersonalSavings(goalId,saving);
             if (response.StatusCode == 200)
             {
                 return Ok(response);
@@ -64,10 +67,11 @@ namespace KoboRack.Api.Controllers
             return BadRequest(response);
         }
         
+
         [HttpDelete("{goalId}")]
         public async Task<IActionResult> DeleteGoal(string goalId, [FromQuery] string userId)
         {
-            var response = await _personalSavings.DeletePersonalSavings(goalId, userId);
+            var response = await _personalSavings.DeletePersonalSavings(goalId);
             if (response.StatusCode == 200)
             {
                 return Ok(response);
@@ -78,7 +82,7 @@ namespace KoboRack.Api.Controllers
         [HttpGet("totalGoalAmount/{userId}")]
         public async Task<IActionResult> GetTotalGoalAmountByUser(string userId)
         {
-            var response = await _personalSavings.GetTotalGoalAmountByUser(userId);
+            var response = await _personalSavings.GetUserTotalGoalAmount(userId);
 
             return response.StatusCode switch
             {

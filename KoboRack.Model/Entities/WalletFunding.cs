@@ -1,4 +1,5 @@
-﻿using KoboRack.Model.Enums;
+﻿using KoboRack.Model.Commons;
+using KoboRack.Model.Enums;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace KoboRack.Model.Entities

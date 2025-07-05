@@ -1,4 +1,4 @@
-﻿using KoboRack.Model.Entities;
+﻿using KoboRack.Model.Commons;
 
 namespace KoboRack.Api.Extensions
 {
