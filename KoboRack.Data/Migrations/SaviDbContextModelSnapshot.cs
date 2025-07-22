@@ -544,6 +544,9 @@ namespace KoboRack.Data.Migrations
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("TargetAmount")
                         .HasColumnType("numeric");
 
@@ -592,6 +595,9 @@ namespace KoboRack.Data.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
+
+                    b.Property<decimal>("LockedAmount")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTime>("ModifiedAt")
                         .HasColumnType("timestamp with time zone");

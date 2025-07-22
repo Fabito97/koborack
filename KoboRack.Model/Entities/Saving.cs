@@ -13,7 +13,7 @@ namespace KoboRack.Model.Entities
         public bool AutoSave { get; set; } = false;
         public string GoalUrl { get; set; }
         public string Purpose { get; set; } = string.Empty;
-        
+        public Status Status { get; set; }
         public string Avatar { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }

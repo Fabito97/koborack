@@ -40,7 +40,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<Saving> FindSavings(Expression<Func<Saving, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<Saving> GetSavingByIdAsync(string id)
         {

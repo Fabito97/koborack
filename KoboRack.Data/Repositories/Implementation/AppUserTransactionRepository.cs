@@ -28,7 +28,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<AppUserTransaction> FindAppUserTransactions(Expression<Func<AppUserTransaction, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<AppUserTransaction> GetAppUserTransactionByIdAsync(string id)
         {

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace KoboRack.Api.Controllers
 {
-    [Authorize]
+    //[Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class WalletController : ControllerBase

@@ -47,13 +47,13 @@ namespace KoboRack.Core.Services
                     throw new ArgumentException("Reference missing from webhook data");
 
                 var transaction = _unitOfWork.AppUserTransactionRepository
-                    .FindAsync(t => t.Reference == reference && t.Amount == amount).FirstOrDefault();
+                    .Find(t => t.Reference == reference && t.Amount == amount).FirstOrDefault();
 
                 if (transaction == null)
                     throw new InvalidOperationException("Transaction not found or already processed");
 
                 var wallet = _unitOfWork.WalletRepository
-                    .FindAsync(w => w.Id == transaction.WalletId).FirstOrDefault();
+                    .Find(w => w.Id == transaction.WalletId).FirstOrDefault();
 
                 if (wallet == null)
                     throw new InvalidOperationException("Wallet linked to transaction not found");
@@ -123,7 +123,7 @@ namespace KoboRack.Core.Services
             decimal amount = (decimal)data.amount / 100;
 
             // Lookup wallet by Paystack customer code
-            var wallet = _unitOfWork.WalletRepository.FindAsync(w => w.PaystackCustomerCode == customerCode);
+            var wallet = _unitOfWork.WalletRepository.Find(w => w.PaystackCustomerCode == customerCode);
             if (wallet == null) return;
 
             //await _walletService.CreditFromTransferAsync(wallet, amount, data.reference);

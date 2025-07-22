@@ -12,6 +12,7 @@ using KoboRack.Model.Entities;
 using KoboRack.Utility;
 using KoboRack.Core.Commons;
 using KoboRack.Model.Enums;
+using KoboRack.Data.Context;
 
 namespace KoboRack.Core.Services
 {
@@ -19,13 +20,14 @@ namespace KoboRack.Core.Services
     {
         private readonly ILogger _logger;
         private readonly UserManager<AppUser> userManager;
+        private readonly SaviDbContext _dbContext;
         private readonly IUnitOfWork unitOfWork;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
         private readonly IPaystackCustomerService _paystackService;
         private readonly ICurrentUserService _currentUserService;
 
-        public WalletServices(ILogger<WalletServices> logger, UserManager<AppUser> userManager, IUnitOfWork unitOfWork, IConfiguration configuration, IPaystackCustomerService paystackService, ICurrentUserService currentUserService)
+        public WalletServices(ILogger<WalletServices> logger, UserManager<AppUser> userManager, IUnitOfWork unitOfWork, IConfiguration configuration, IPaystackCustomerService paystackService, ICurrentUserService currentUserService, SaviDbContext dbContext)
         {
             _logger = logger;
             this.userManager = userManager;
@@ -36,29 +38,24 @@ namespace KoboRack.Core.Services
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {secretKey}");
             _paystackService = paystackService;
             _currentUserService = currentUserService;
+            _dbContext = dbContext;
         }
 
 
-        public async Task<ApiResponse<string>> CreateWallet(AppUser user)
+        public async Task<ApiResponse<string>> CreateAndLinkWalletToPaystack(AppUser user)
         {
+            using var transaction = await _dbContext.Database.BeginTransactionAsync();
             var userId = user.Id;
-            var wallet = new Wallet();
+                
+            if (user == null)
+            {
+                return new ApiResponse<string>(false, "User not found.", StatusCodes.Status400BadRequest, new List<string> { "User not found." });
+            }
+
             try
             {
-                //var user = await userManager.FindByIdAsync(userId);
-                if (user == null)
-                {
-                    return new ApiResponse<string>(false, "User not found.", StatusCodes.Status400BadRequest, new List<string> { "User not found." });
-                }
-
-                var existingWallet = unitOfWork.WalletRepository.FindAsync(w => w.AppUserId == userId).FirstOrDefault();
-                if (existingWallet != null && !string.IsNullOrEmpty(wallet?.PaystackCustomerCode))
-                {
-                    return ApiResponse<string>.Success(wallet.PaystackCustomerCode, "Paystack customer account already exist.", StatusCodes.Status200OK);                   
-                }
-               
                 var setWallet = new SetWalletAccountNumber();
-                wallet = existingWallet ?? new Wallet
+                Wallet wallet = new Wallet
                 {
                     Id = Guid.NewGuid().ToString(),
                     WalletNumber = setWallet.SetWalletNumber(user.PhoneNumber),
@@ -67,16 +64,16 @@ namespace KoboRack.Core.Services
                     TransactionPin = "1234"
                 };
 
-                if (existingWallet == null)
-                    await unitOfWork.WalletRepository.AddWalletAsync(wallet);               
+                await unitOfWork.WalletRepository.AddWalletAsync(wallet);               
 
                 var result = await _paystackService.CreateCustomerAsync(user, wallet.WalletNumber);
 
                 if (!result.IsSuccess)
                 {
-                    throw new Exception($"Failed to create Paystack customer: {result.ErrorMessage}");
+                    transaction.Rollback();
+                    return new ApiResponse<string>(false, result.ErrorMessage, StatusCodes.Status400BadRequest);
                 }
-               
+
                 wallet.PaystackCustomerCode = result.CustomerCode;
                 wallet.Reference = result.InternalId;
                 unitOfWork.WalletRepository.UpdateAsync(wallet);
@@ -86,6 +83,7 @@ namespace KoboRack.Core.Services
             }
             catch (Exception ex)
             {
+                transaction.Rollback();
                 _logger.LogError(ex, "Error occurred while creating a wallet. " + ex.InnerException);
                 return new ApiResponse<string>(false, "Error occurred while creating a wallet.", StatusCodes.Status500InternalServerError);
             }
@@ -108,7 +106,7 @@ namespace KoboRack.Core.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     var reason = $"Paystack error: {response.StatusCode} - {response.ReasonPhrase}";
-                    return ApiResponse<string>.Failed(false, reason, StatusCodes.Status502BadGateway, null);
+                    return ApiResponse<string>.Failed(false, reason, (int)response.StatusCode, null);
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -139,7 +137,7 @@ namespace KoboRack.Core.Services
                 unitOfWork.WalletRepository.UpdateAsync(wallet);
 
                 var transaction = unitOfWork.AppUserTransactionRepository
-                    .FindAsync(w => w.Reference == referenceCode && w.Amount == amount)
+                    .Find(w => w.Reference == referenceCode && w.Amount == amount)
                     .FirstOrDefault();
 
                 if (transaction == null)
@@ -158,13 +156,15 @@ namespace KoboRack.Core.Services
                     WalletNumber = wallet.WalletNumber,
                     WalletId = wallet.Id,
                     CumulativeAmount = wallet.Balance,
-                    TransactionType = Model.Enums.TransactionType.Credit
+                    TransactionType = TransactionType.Credit
                 };
 
                 await unitOfWork.WalletFundingRepository.AddAsync(walletFunding);
                 unitOfWork.SaveChanges(); // Consider using async
 
                 var successMessage = $"Payment of {amount:N0} Naira from {email} was successful!";
+
+                _logger.LogInformation(successMessage);
                 return ApiResponse<string>.Success(successMessage, successMessage, StatusCodes.Status200OK);
             }
             catch (HttpRequestException ex)
@@ -191,15 +191,31 @@ namespace KoboRack.Core.Services
                     DisplayMessage = "User does not have a wallet.",
                 };
             }
+
+            // Dynamically calculate locked amount
+            decimal savingsLocked = unitOfWork.SavingRepository
+                .Find(s => s.UserId == userId && s.Status == Status.Active)
+                .Sum(s => s.AmountSaved); 
+
+            decimal groupLocked = unitOfWork.GroupRepository
+                .Find(g => g.AppUsers.Any(m => m.Id == userId) && g.GroupStatus == GroupStatus.OnGoing)
+                .Sum(g => g.ContributionAmount);
+
+            decimal totalLocked = savingsLocked + groupLocked;
+
             var walletDto = new WalletDto
             {
                 Currency = wallet.Currency,
-                AppUserId = wallet.AppUserId,
+                UserId = wallet.AppUserId,
                 Reference = wallet.Reference,
                 Balance = wallet.Balance,
                 WalletNumber = wallet.WalletNumber,
+                PaystackCustomerCode = wallet.PaystackCustomerCode,
                 Id = wallet.Id,
+                LockedAmount = totalLocked, // set the computed locked amount
+                                            // AvailableBalance is auto-computed via WalletDto property
             };
+
             return new ResponseDto<WalletDto>()
             {
                 StatusCode = 200,
@@ -207,6 +223,7 @@ namespace KoboRack.Core.Services
                 Result = walletDto,
             };
         }
+
         private ResponseDto<Wallet> UpdateWallet(string userId, decimal amount)
         {
             var wallet = unitOfWork.WalletRepository.WalletById(userId);

@@ -28,7 +28,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<WalletFunding> FindWalletFundings(Expression<Func<WalletFunding, bool>> expression)
         {
-            return FindAsync(expression).ToList();
+            return Find(expression).ToList();
         }
 
         public async Task<WalletFunding> GetWalletFundingByIdAsync(string id)

@@ -269,7 +269,7 @@ namespace KoboRack.Core.Services
             if (!string.Equals(otp.Value, hashedToken, StringComparison.Ordinal))
                 return ApiResponse<string>.Failed(false, "Invalid OTP", StatusCodes.Status400BadRequest, null);
 
-            // ✅ Mark OTP as used and confirm email
+           
             otp.IsUsed = true;
             //otp.Value = null;
             user.EmailConfirmed = true;
@@ -280,12 +280,17 @@ namespace KoboRack.Core.Services
 
             try
             {
-                // 🏦 Create wallet and link Paystack customer
-                var response = await services.CreateWallet(user);
+                Wallet existingWallet = _saviDbContext.Wallets.FirstOrDefault(w => w.AppUserId == userId);
+                if (existingWallet != null)
+                {
+                    return ApiResponse<string>.Success("OTP verified", "Email confirmed successfully, but wallet already exists.", StatusCodes.Status200OK);
+                }                
+
+                var response = await services.CreateAndLinkWalletToPaystack(user);
                 if (!response.Succeeded)
                     return ApiResponse<string>.Success(token, response.Message, StatusCodes.Status200OK);
                 
-                return ApiResponse<string>.Success(token, "OTP verified and wallet created", StatusCodes.Status200OK);
+                return ApiResponse<string>.Success(token, "OTP verified and wallet created successfully", StatusCodes.Status200OK);
             }
             catch (Exception ex)
             {

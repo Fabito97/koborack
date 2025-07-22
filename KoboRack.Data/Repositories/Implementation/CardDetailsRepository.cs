@@ -28,7 +28,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<CardDetail> FindCardDetails(Expression<Func<CardDetail, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<CardDetail> GetCardDetailByIdAsync(string id)
         {
