@@ -39,7 +39,7 @@ namespace KoboRack.Core.Services
                 if (user == null)
                     return ApiResponse<CreditResponseDto>.Failed(false, "User not found", 401, null);
 
-                var wallet = _unitOfWork.WalletRepository.FindAsync(w => w.AppUserId == userId).FirstOrDefault();
+                var wallet = _unitOfWork.WalletRepository.Find(w => w.AppUserId == userId).FirstOrDefault();
 
                 //var walletResponse = await GetWalletByNumber(fundWalletDto.WalletNumber);
                 if (wallet == null)
@@ -53,11 +53,13 @@ namespace KoboRack.Core.Services
                 var walletTransaction = new AppUserTransaction
                 {
                     WalletId = wallet.Id,
+                    AppUserId = user.Id,
                     Amount = fundWalletDto.FundAmount,
                     TransactionType = TransactionType.Credit,
                     Status = TransactionStatus.Pending,
                     Reference = reference,
                     Description = fundWalletDto.Naration ?? "Wallet top-up pending via card"
+                    
                 };
                 await _unitOfWork.AppUserTransactionRepository.AddAsync(walletTransaction);
                 _unitOfWork.SaveChanges();
@@ -101,7 +103,7 @@ namespace KoboRack.Core.Services
 
 		public async Task<ApiResponse<Wallet>> GetWalletByNumber(string phone)
 		{
-			var wallets = _unitOfWork.WalletRepository.FindAsync(x => x.WalletNumber == phone);
+			var wallets = _unitOfWork.WalletRepository.Find(x => x.WalletNumber == phone);
 
 			if (wallets.Count < 1)
 			{

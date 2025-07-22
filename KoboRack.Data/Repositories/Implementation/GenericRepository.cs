@@ -42,7 +42,7 @@ namespace KoboRack.Data.Repositories.Implementation
             return await _context.Set<T>().AnyAsync(expression);
         }
 
-        public List<T> FindAsync(Expression<Func<T, bool>> expression)
+        public List<T> Find(Expression<Func<T, bool>> expression)
         {
             return _context.Set<T>().Where(expression).ToList();
         }

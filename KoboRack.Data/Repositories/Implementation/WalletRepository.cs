@@ -32,7 +32,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<Wallet> FindWallets(Expression<Func<Wallet, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<Wallet> GetWalletByIdAsync(string id)
         {

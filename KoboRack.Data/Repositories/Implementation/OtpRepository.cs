@@ -28,7 +28,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<Otp> FindOtps(Expression<Func<Otp, bool>> expression)
         {
-            return FindAsync(expression).ToList();
+            return Find(expression).ToList();
         }
 
         public async Task<Otp> GetOtpByIdAsync(string id)

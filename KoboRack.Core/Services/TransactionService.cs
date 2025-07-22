@@ -1,4 +1,5 @@
-﻿using KoboRack.Core.IServices;
+﻿using KoboRack.Core.DTO;
+using KoboRack.Core.IServices;
 using KoboRack.Data.Repositories.Interface;
 using KoboRack.Model;
 using KoboRack.Model.Entities;
@@ -23,7 +24,7 @@ namespace KoboRack.Core.Services
             _userManager = userManager;
         }
 
-        public async Task<ApiResponse<List<AppUserTransaction>>> GetAllTransactionsAsync(string userId)
+        public async Task<ApiResponse<List<TransactionDto>>> GetAllTransactionsAsync(string userId)
         {
 
             if (string.IsNullOrEmpty(userId))
@@ -34,17 +35,28 @@ namespace KoboRack.Core.Services
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
-                return new ApiResponse<List<AppUserTransaction>>(false, "User not found.", StatusCodes.Status404NotFound);
+                return new ApiResponse<List<TransactionDto>>(false, "User not found.", StatusCodes.Status404NotFound);
             }
 
-            var result = _userTransaction.FindAppUserTransactions(w => w.AppUserId == userId).ToList();
+            var result = _userTransaction.FindAppUserTransactions(w => w.AppUserId == userId)
+                .Select(t => new TransactionDto()
+            {
+                    Description = t.Description,
+                    Amount = t.Amount,
+                    TransactionType = t.TransactionType.ToString(),
+                    Reference = t.Reference,
+                    CreatedAt = t.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+
+                }).ToList();
+
+            
 
             if (result.Count == 0)
             {
-                new ApiResponse<List<AppUserTransaction>>(true, "No transactions available", StatusCodes.Status200OK, result);
+                new ApiResponse<List<TransactionDto>>(true, "No transactions available", StatusCodes.Status200OK, result);
             }
 
-            return new ApiResponse<List<AppUserTransaction>>(true, "Transactions retrieved successfully", StatusCodes.Status200OK, result);
+            return new ApiResponse<List<TransactionDto>>(true, "Transactions retrieved successfully", StatusCodes.Status200OK, result);
         }
     }
 }

@@ -42,7 +42,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<FundingAnalytics> FindFundingAnalyticss(Expression<Func<FundingAnalytics, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
 
         public List<FundingAnalytics> GetFundingAnalytics(Expression<Func<FundingAnalytics, bool>> expression)

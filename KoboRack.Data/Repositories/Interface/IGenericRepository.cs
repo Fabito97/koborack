@@ -8,7 +8,7 @@ namespace KoboRack.Data.Repositories.Interface
         Task<T> GetByIdAsync(string id);
         List<T> GetAll();
         List<T> GetAll(Expression<Func<T, bool>> predicate = null);
-        List<T> FindAsync(Expression<Func<T, bool>> expression);
+        List<T> Find(Expression<Func<T, bool>> expression);
         Task AddAsync(T entity);
         T AddAsync2(T entity);
         void UpdateAsync(T entity);

@@ -32,7 +32,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<Group> FindGroups(Expression<Func<Group, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<Group> GetGroupByIdAsync(string id)
         {

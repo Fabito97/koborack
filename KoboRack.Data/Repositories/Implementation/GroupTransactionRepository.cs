@@ -28,7 +28,7 @@ namespace KoboRack.Data.Repositories.Implementation
 
         public List<GroupTransaction> FindGroupTransactions(Expression<Func<GroupTransaction, bool>> expression)
         {
-            return FindAsync(expression);
+            return Find(expression);
         }
         public async Task<GroupTransaction> GetGroupTransactionByIdAsync(string id)
         {

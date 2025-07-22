@@ -10,10 +10,9 @@ namespace KoboRack.Model.Entities
         public decimal Balance { get; set; }
         public string Reference { get; set; }
 
-        //public decimal LockedAmount { get; set; } // Funds committed to savings goals
-        //public decimal PendingAmount { get; set; } // Incoming but unconfirmed funds
+        public decimal LockedAmount { get; set; } // Funds committed to savings goals
 
-        //public decimal AvailableBalance => Balance - LockedAmount - PendingAmount;
+        public decimal AvailableBalance => Balance - LockedAmount;
 
         public string PaystackCustomerCode { get; set; }
         //public string? VirtualAccountNumber { get; set; }
